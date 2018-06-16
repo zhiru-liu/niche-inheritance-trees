@@ -21,6 +21,8 @@ class Node:
         # the speciation_time of the node
         # spec-born = length of the edge
         self.alive = True  # extinct node will be False
+        if self.spec == np.inf:
+            self.alive = False
         # We don't remove the node in current version
         # below are topological measures
         self.C = None
@@ -135,8 +137,8 @@ class Tree:
             else:
                 print('The system went extinct at size %d, please\
                         try again or adjust the parameters' % size)
-                return
-        return
+                return active_nodes
+        return active_nodes
 
     def get_AC_list(self):
         lst = []
