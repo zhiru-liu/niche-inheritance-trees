@@ -21,12 +21,15 @@ class Node:
         # the speciation_time of the node
         # spec-born = length of the edge
         self.alive = True  # extinct node will be False
-        if self.spec == np.inf:
-            self.alive = False
         # We don't remove the node in current version
         # below are topological measures
         self.C = None
         self.A = None
+        # T is the number of tips, as defined in O Dwyer
+        # is_new means that this node is the start of a new species,
+        # that is, start counting edge len from this node
+        self.T = None
+        self.is_new = None
 
     def __eq__(self, other):
         return self.spec == other.spec
@@ -70,6 +73,73 @@ class Node:
         extinction(self.left)
         extinction(self.right)
         return self.left, self.right
+
+    def check_if_new(self):
+        # don't call this when self is dead
+        if self.parent is None:
+            # this is the root node
+            return True
+        if self.parent.left.alive and self.parent.right.alive:
+            # this is a new species
+            return True
+        elif not self.parent.left.alive and not self.parent.right.alive:
+            # Shouldn't happen, since self should be alive
+            raise ValueError('Encountered dead node in the list.')
+        else:
+            return False
+
+    def get_edge_length(self, clock):
+        if self.is_new is None:
+            raise ValueError('is_new does not exist. Make sure\
+                    you get_T first.')
+        if not self.is_new:
+            # This is not a new species.
+            return None
+        length = 0
+        curr = self
+        while True:
+            if curr.left is None and curr.right is None:
+                # this is a tip
+                length += clock - self.born
+                return length if curr.spec != np.inf else None
+            else:
+                if curr.left.alive and curr.right.alive:
+                    # the end of this edge
+                    length += curr.left.born - curr.born
+                    return length
+                elif curr.left.alive:
+                    # go deeper along this edge
+                    length += curr.left.born - curr.born
+                    curr = curr.left
+                    continue
+                elif curr.right.alive:
+                    length += curr.right.born - curr.born
+                    curr = curr.right
+                    continue
+                else:
+                    # This species went extinct. Shouldn't see it
+                    return None
+
+    def get_T(self):
+        if self.T:
+            return self.T
+        else:
+            self.is_new = self.check_if_new()
+            if self.left is None and self.right is None:
+                # this is a tip
+                self.T = 1
+                return self.T
+            left_T = 0
+            right_T = 0
+            if self.left and self.left.alive:
+                left_T = self.left.get_T()
+            if self.right and self.right.alive:
+                right_T = self.right.get_T()
+            self.T = left_T + right_T
+            ''' notice that T could be zero, in which case
+            the species went extinct
+            '''
+            return self.T
 
     def get_A(self):
         if self.A:
@@ -127,24 +197,43 @@ class Tree:
                 # give birth to two nodes at clock time
                 left, right = curr.speciation(mu, sigma, clock)
                 if left.alive:
-                    active_nodes.put(left)
+                    if left.spec != np.inf:
+                        active_nodes.put(left)
                     self.node_list.append(left)
                     size += 1
                 if right.alive:
-                    active_nodes.put(right)
+                    if right.spec != np.inf:
+                        active_nodes.put(right)
                     self.node_list.append(right)
                     size += 1
             else:
                 print('The system went extinct at size %d, please\
                         try again or adjust the parameters' % size)
-                return active_nodes
-        return active_nodes
+                return active_nodes, clock
+        return active_nodes, clock
 
     def get_AC_list(self):
         lst = []
         for node in reversed(self.node_list):
             lst.append(np.array([node.get_A(), node.get_C()]))
         return np.array(lst)
+
+    def get_EAD(self, clock):
+        lst = []
+        for node in reversed(self.node_list):
+            # this pass, calculate all the T and is_new
+            node.get_T()
+        for node in reversed(self.node_list):
+            length = node.get_edge_length(clock)
+            if length:
+                lst.append(np.array([node.get_T(), length]))
+        return np.array(lst)
+
+    def get_specs(self):
+        result = []
+        for node in self.node_list:
+            result.append(node.spec)
+        return np.array(result)
 
 
 def extinction(x):
