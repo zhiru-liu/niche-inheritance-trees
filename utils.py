@@ -15,12 +15,14 @@ class Node:
         self.left = left  # left node
         self.right = right  # right node
         self.parent = parent  # we can trace back the tree
-        self.t2s = None  # time to speciation
         self.born = born_time  # the birth time of this node
         self.spec = self.born + self.get_speciation_time()
         # the speciation_time of the node
         # spec-born = length of the edge
         self.alive = True  # extinct node will be False
+        self.is_new = None  # whether is a new species
+        self.visible = False  # whether this node is \
+        # visible when traced back
         # We don't remove the node in current version
         # below are topological measures
         self.C = None
@@ -29,7 +31,6 @@ class Node:
         # is_new means that this node is the start of a new species,
         # that is, start counting edge len from this node
         self.T = None
-        self.is_new = None
 
     def __eq__(self, other):
         return self.spec == other.spec
@@ -167,6 +168,53 @@ class Node:
             self.C = left_C + right_C + self.get_A()
             return self.C
 
+    def to_string(self, clock):
+        # this will convert the full tree, including dead nodes
+        if not self.alive or self.spec == np.inf:
+            return ':' + str(0)
+        if self.left is None and self.right is None:
+            return ':' + str(clock-self.born)
+        else:
+            leftStr = self.left.to_string(clock)
+            rightStr = self.right.to_string(clock)
+            return '(' + leftStr + ',' + rightStr + ')' \
+                       + ':' + str(self.left.born-self.born)
+
+    def to_string_pruned(self, clock):
+        # this will throw away nodes invisible when traced backward
+        if not self.visible:
+            raise ValueError('Error when trying to prune invisible node')
+
+        length = 0  # I decided to recalculate edge length
+        curr = self
+        while True:
+            if curr.left is None and curr.right is None:
+                # this is a tip
+                length += clock - curr.born
+                return ':' + str(length)
+            else:
+                if curr.left.visible and curr.right.visible:
+                    # the end of this edge
+                    length += curr.left.born - curr.born
+                    leftStr = curr.left.to_string_pruned(clock)
+                    rightStr = curr.right.to_string_pruned(clock)
+                    return '(' + leftStr + ',' + rightStr + ')' \
+                               + ':' + str(length)
+                elif curr.left.visible:
+                    # go deeper along this edge
+                    length += curr.left.born - curr.born
+                    curr = curr.left
+                    continue
+                elif curr.right.visible:
+                    length += curr.right.born - curr.born
+                    curr = curr.right
+                    continue
+                else:
+                    # This species went extinct. Shouldn't see it
+                    raise ValueError('Child of visible node must \
+                                     be visible')
+        return
+
 
 class Tree:
     def __init__(self, n=1, r_e=0, R_0=0):
@@ -210,7 +258,20 @@ class Tree:
                 print('The system went extinct at size %d, please\
                         try again or adjust the parameters' % size)
                 return active_nodes, clock
+        self.trace_back(active_nodes)  # mark nodes as visible
         return active_nodes, clock
+
+    def trace_back(self, queue):
+        while not queue.empty():
+            curr = queue.get()
+            curr.visible = True
+            while curr.parent is not None:
+                if curr.parent.visible:
+                    break
+                else:
+                    curr.parent.visible = True
+                    curr = curr.parent
+        return
 
     def get_AC_list(self):
         lst = []
@@ -234,6 +295,16 @@ class Tree:
         for node in self.node_list:
             result.append(node.spec)
         return np.array(result)
+
+    def save_tree(self, clock, filename, pruned=True):
+        if pruned:
+            tree_str = self.root.to_string_pruned(clock)
+        else:
+            tree_str = self.root.to_string(clock)
+        f = open(filename, 'w')
+        f.write(tree_str)
+        f.close()
+        return
 
 
 def extinction(x):
