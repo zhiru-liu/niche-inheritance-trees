@@ -75,71 +75,55 @@ class Node:
         extinction(self.right)
         return self.left, self.right
 
-    def check_if_new(self):
-        # don't call this when self is dead
-        if self.parent is None:
-            # this is the root node
-            return True
-        if self.parent.left.alive and self.parent.right.alive:
-            # this is a new species
-            return True
-        elif not self.parent.left.alive and not self.parent.right.alive:
-            # Shouldn't happen, since self should be alive
-            raise ValueError('Encountered dead node in the list.')
-        else:
-            return False
-
-    def get_edge_length(self, clock):
-        if self.is_new is None:
-            raise ValueError('is_new does not exist. Make sure\
-                    you get_T first.')
-        if not self.is_new:
-            # This is not a new species.
-            return None
-        length = 0
+    def prune(self):
+        if not self.visible:
+            raise ValueError('Calling prune on invisible node')
         curr = self
         while True:
             if curr.left is None and curr.right is None:
-                # this is a tip
-                length += clock - self.born
-                return length if curr.spec != np.inf else None
-            else:
-                if curr.left.alive and curr.right.alive:
-                    # the end of this edge
-                    length += curr.left.born - curr.born
-                    return length
-                elif curr.left.alive:
-                    # go deeper along this edge
-                    length += curr.left.born - curr.born
-                    curr = curr.left
-                    continue
-                elif curr.right.alive:
-                    length += curr.right.born - curr.born
-                    curr = curr.right
-                    continue
-                else:
-                    # This species went extinct. Shouldn't see it
-                    return None
+                self.spec = curr.spec
+                self.left = None
+                self.right = None
+                return
+
+            if curr.left.visible and curr.right.visible:
+                # reaching the speciation point
+                self.spec = curr.spec
+                self.left = curr.left
+                self.right = curr.right
+                self.left.prune()
+                self.right.prune()
+                return
+
+            if curr.left.visible:
+                curr = curr.left
+                continue
+            elif curr.right.visible:
+                curr = curr.right
+                continue
+
+    def get_edge_length(self, clock):
+        if self.left is None and self.right is None:
+            # this is a tip
+            return clock - self.born
+        else:
+            return self.spec - self.born
 
     def get_T(self):
         if self.T:
             return self.T
         else:
-            self.is_new = self.check_if_new()
             if self.left is None and self.right is None:
                 # this is a tip
                 self.T = 1
                 return self.T
             left_T = 0
             right_T = 0
-            if self.left and self.left.alive:
+            if self.left:
                 left_T = self.left.get_T()
-            if self.right and self.right.alive:
+            if self.right:
                 right_T = self.right.get_T()
             self.T = left_T + right_T
-            ''' notice that T could be zero, in which case
-            the species went extinct
-            '''
             return self.T
 
     def get_A(self):
@@ -148,9 +132,9 @@ class Node:
         else:
             left_A = 0
             right_A = 0
-            if self.left and self.left.alive:
+            if self.left:
                 left_A = self.left.get_A()
-            if self.right and self.right.alive:
+            if self.right:
                 right_A = self.right.get_A()
             self.A = left_A + right_A + 1
             return self.A
@@ -161,59 +145,21 @@ class Node:
         else:
             left_C = 0
             right_C = 0
-            if self.left and self.left.alive:
+            if self.left:
                 left_C = self.left.get_C()
-            if self.right and self.right.alive:
+            if self.right:
                 right_C = self.right.get_C()
             self.C = left_C + right_C + self.get_A()
             return self.C
 
     def to_string(self, clock):
-        # this will convert the full tree, including dead nodes
-        if not self.alive or self.spec == np.inf:
-            return ':' + str(0)
         if self.left is None and self.right is None:
             return ':' + str(clock-self.born)
         else:
             leftStr = self.left.to_string(clock)
             rightStr = self.right.to_string(clock)
             return '(' + leftStr + ',' + rightStr + ')' \
-                       + ':' + str(self.left.born-self.born)
-
-    def to_string_pruned(self, clock):
-        # this will throw away nodes invisible when traced backward
-        if not self.visible:
-            raise ValueError('Error when trying to prune invisible node')
-
-        length = 0  # I decided to recalculate edge length
-        curr = self
-        while True:
-            if curr.left is None and curr.right is None:
-                # this is a tip
-                length += clock - curr.born
-                return ':' + str(length)
-            else:
-                if curr.left.visible and curr.right.visible:
-                    # the end of this edge
-                    length += curr.left.born - curr.born
-                    leftStr = curr.left.to_string_pruned(clock)
-                    rightStr = curr.right.to_string_pruned(clock)
-                    return '(' + leftStr + ',' + rightStr + ')' \
-                               + ':' + str(length)
-                elif curr.left.visible:
-                    # go deeper along this edge
-                    length += curr.left.born - curr.born
-                    curr = curr.left
-                    continue
-                elif curr.right.visible:
-                    length += curr.right.born - curr.born
-                    curr = curr.right
-                    continue
-                else:
-                    # This species went extinct. Shouldn't see it
-                    raise ValueError('Child of visible node must \
-                                     be visible')
-        return
+                       + ':' + str(self.spec-self.born)
 
 
 class Tree:
@@ -239,27 +185,29 @@ class Tree:
         while size < tree_size:
             if not active_nodes.empty():
                 curr = active_nodes.get()
+                if curr.spec == np.inf:
+                    print('All nodes stops speciating at size %d, please\
+                            try again or adjust the parameters' % size)
+                    return False, clock
                 clock = curr.spec  # forward time to spec time
                 if not curr.alive:
                     continue
                 # give birth to two nodes at clock time
                 left, right = curr.speciation(mu, sigma, clock)
                 if left.alive:
-                    if left.spec != np.inf:
-                        active_nodes.put(left)
+                    active_nodes.put(left)
                     self.node_list.append(left)
                     size += 1
                 if right.alive:
-                    if right.spec != np.inf:
-                        active_nodes.put(right)
+                    active_nodes.put(right)
                     self.node_list.append(right)
                     size += 1
             else:
                 print('The system went extinct at size %d, please\
                         try again or adjust the parameters' % size)
-                return active_nodes, clock
+                return False, clock
         self.trace_back(active_nodes)  # mark nodes as visible
-        return active_nodes, clock
+        return True, clock
 
     def trace_back(self, queue):
         while not queue.empty():
@@ -276,18 +224,20 @@ class Tree:
     def get_AC_list(self):
         lst = []
         for node in reversed(self.node_list):
-            lst.append(np.array([node.get_A(), node.get_C()]))
+            if node.visible:
+                lst.append(np.array([node.get_A(), node.get_C()]))
         return np.array(lst)
 
     def get_EAD(self, clock):
         lst = []
         for node in reversed(self.node_list):
-            # this pass, calculate all the T and is_new
+            # this pass, calculate all the T
             node.get_T()
         for node in reversed(self.node_list):
             length = node.get_edge_length(clock)
-            if length:
-                lst.append(np.array([node.get_T(), length]))
+            if length == np.inf:
+                raise ValueError('Edge length cannot be inf')
+            lst.append(np.array([node.get_T(), length]))
         return np.array(lst)
 
     def get_specs(self):
@@ -296,11 +246,12 @@ class Tree:
             result.append(node.spec)
         return np.array(result)
 
+    def prune_tree(self):
+        self.root.prune()
+        return
+
     def save_tree(self, clock, filename, pruned=True):
-        if pruned:
-            tree_str = self.root.to_string_pruned(clock)
-        else:
-            tree_str = self.root.to_string(clock)
+        tree_str = self.root.to_string(clock)
         f = open(filename, 'w')
         f.write(tree_str)
         f.close()
