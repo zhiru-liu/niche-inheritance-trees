@@ -20,7 +20,6 @@ class Node:
         # the speciation_time of the node
         # spec-born = length of the edge
         self.alive = True  # extinct node will be False
-        self.is_new = None  # whether is a new species
         self.visible = False  # whether this node is \
         # visible when traced back
         # We don't remove the node in current version
@@ -28,8 +27,6 @@ class Node:
         self.C = None
         self.A = None
         # T is the number of tips, as defined in O Dwyer
-        # is_new means that this node is the start of a new species,
-        # that is, start counting edge len from this node
         self.T = None
 
     def __eq__(self, other):
@@ -186,9 +183,9 @@ class Tree:
             if not active_nodes.empty():
                 curr = active_nodes.get()
                 if curr.spec == np.inf:
-                    print('All nodes stops speciating at size %d, please\
-                            try again or adjust the parameters' % size)
-                    return False, clock
+                    #print('All nodes stops speciating at size %d, please\
+                    #        try again or adjust the parameters' % size)
+                    return False, size
                 clock = curr.spec  # forward time to spec time
                 if not curr.alive:
                     continue
@@ -203,9 +200,9 @@ class Tree:
                     self.node_list.append(right)
                     size += 1
             else:
-                print('The system went extinct at size %d, please\
-                        try again or adjust the parameters' % size)
-                return False, clock
+                #print('The system went extinct at size %d, please\
+                #        try again or adjust the parameters' % size)
+                return False, size
         self.trace_back(active_nodes)  # mark nodes as visible
         return True, clock
 
@@ -238,6 +235,14 @@ class Tree:
             if length == np.inf:
                 raise ValueError('Edge length cannot be inf')
             lst.append(np.array([node.get_T(), length]))
+        return np.array(lst)
+
+    def get_n(self):
+        lst = []
+        for node in self.node_list:
+            a = node.get_A()
+            n = node.n
+            lst.append(np.array([a, n]))
         return np.array(lst)
 
     def get_specs(self):
