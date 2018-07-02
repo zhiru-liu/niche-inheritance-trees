@@ -72,33 +72,6 @@ class Node:
         extinction(self.right)
         return self.left, self.right
 
-    def prune(self):
-        if not self.visible:
-            raise ValueError('Calling prune on invisible node')
-        curr = self
-        while True:
-            if curr.left is None and curr.right is None:
-                self.spec = curr.spec
-                self.left = None
-                self.right = None
-                return
-
-            if curr.left.visible and curr.right.visible:
-                # reaching the speciation point
-                self.spec = curr.spec
-                self.left = curr.left
-                self.right = curr.right
-                self.left.prune()
-                self.right.prune()
-                return
-
-            if curr.left.visible:
-                curr = curr.left
-                continue
-            elif curr.right.visible:
-                curr = curr.right
-                continue
-
     def get_edge_length(self, clock):
         if self.left is None and self.right is None:
             # this is a tip
@@ -167,7 +140,7 @@ class Tree:
         n_0 sets the niche of the root node
         '''
         self.root = Node(n, r_e, R_0, born_time=0)
-        self.node_list = [self.root]  # in simulte(), root will be added
+        self.node_list = []  # in simulte(), root will be added
 
     def simulate(self, mu, sigma, tree_size):
         '''
@@ -183,7 +156,7 @@ class Tree:
             if not active_nodes.empty():
                 curr = active_nodes.get()
                 if curr.spec == np.inf:
-                    #print('All nodes stops speciating at size %d, please\
+                    # print('All nodes stops speciating at size %d, please\
                     #        try again or adjust the parameters' % size)
                     return False, size
                 clock = curr.spec  # forward time to spec time
@@ -193,14 +166,12 @@ class Tree:
                 left, right = curr.speciation(mu, sigma, clock)
                 if left.alive:
                     active_nodes.put(left)
-                    self.node_list.append(left)
-                    size += 1
                 if right.alive:
                     active_nodes.put(right)
-                    self.node_list.append(right)
-                    size += 1
+                if left.alive and right.alive:
+                    size += 2
             else:
-                #print('The system went extinct at size %d, please\
+                # print('The system went extinct at size %d, please\
                 #        try again or adjust the parameters' % size)
                 return False, size
         self.trace_back(active_nodes)  # mark nodes as visible
@@ -218,24 +189,57 @@ class Tree:
                     curr = curr.parent
         return
 
+    def prune(self, node):
+        if not node.visible:
+            raise ValueError('Calling prune on invisible node')
+        curr = node
+        self.node_list.append(node)
+        while True:
+            if curr.left is None and curr.right is None:
+                node.spec = curr.spec
+                node.left = None
+                node.right = None
+                return
+
+            if curr.left.visible and curr.right.visible:
+                # reaching the speciation point
+                node.spec = curr.spec
+                node.left = curr.left
+                node.right = curr.right
+                self.prune(node.left)
+                self.prune(node.right)
+                return
+
+            if curr.left.visible:
+                curr = curr.left
+                continue
+            elif curr.right.visible:
+                curr = curr.right
+                continue
+
     def get_AC_list(self):
-        lst = []
-        for node in reversed(self.node_list):
-            if node.visible:
-                lst.append(np.array([node.get_A(), node.get_C()]))
-        return np.array(lst)
+        return self._get_AC_list(self.root)
+
+    def _get_AC_list(self, node):
+        if node.left is None and node.right is None:
+            return [[node.get_A(), node.get_C()]]
+        left_lst = self._get_AC_list(node.left)
+        right_lst = self._get_AC_list(node.right)
+        result_lst = left_lst + right_lst
+        result_lst.append([node.get_A(), node.get_C()])
+        return result_lst
 
     def get_EAD(self, clock):
-        lst = []
-        for node in reversed(self.node_list):
-            # this pass, calculate all the T
-            node.get_T()
-        for node in reversed(self.node_list):
-            length = node.get_edge_length(clock)
-            if length == np.inf:
-                raise ValueError('Edge length cannot be inf')
-            lst.append(np.array([node.get_T(), length]))
-        return np.array(lst)
+        return self._get_EAD_list(self.root, clock)
+
+    def _get_EAD_list(self, node, clock):
+        if node.left is None and node.right is None:
+            return [[node.get_T(), node.get_edge_length(clock)]]
+        left_lst = self._get_EAD_list(node.left, clock)
+        right_lst = self._get_EAD_list(node.right, clock)
+        result_lst = left_lst + right_lst
+        result_lst.append([node.get_T(), node.get_edge_length(clock)])
+        return result_lst
 
     def get_n(self):
         lst = []
@@ -243,7 +247,7 @@ class Tree:
             a = node.get_A()
             n = node.n
             lst.append(np.array([a, n]))
-        return np.array(lst)
+        return lst
 
     def get_specs(self):
         result = []
@@ -252,7 +256,7 @@ class Tree:
         return np.array(result)
 
     def prune_tree(self):
-        self.root.prune()
+        self.prune(self.root)
         return
 
     def save_tree(self, clock, filename, pruned=True):

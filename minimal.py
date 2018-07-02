@@ -76,6 +76,13 @@ class Node:
             self.C = left_C + right_C + self.get_A()
             return self.C
 
+    def get_edge_length(self, clock):
+        if self.left is None and self.right is None:
+            # this is a tip
+            return clock - self.born
+        else:
+            return self.spec - self.born
+
     def to_string(self, clock):
         if self.left is None and self.right is None:
             return ':' + str(clock-self.born)
@@ -98,7 +105,7 @@ class Node:
 
             if curr.left.visible and curr.right.visible:
                 # reaching the speciation point
-                self.spec = curr.born + curr.length - self.born
+                self.length = curr.born + curr.length - self.born
                 self.left = curr.left
                 self.right = curr.right
                 self.left.prune()
@@ -129,7 +136,7 @@ class Tree:
             if not active_nodes.empty():
                 curr = active_nodes.get()
                 clock = curr.born + curr.length
-                ''' this is the dead later version '''
+                ''' this is the dead later version 
                 if np.random.rand() < self.speciation_prob:
                     # success
                     left, right = curr.speciation(clock)
@@ -138,6 +145,17 @@ class Tree:
                     self.node_list.append(left)
                     self.node_list.append(right)
                     size += 2
+                '''
+                ''' this is dead first version'''
+                left, right = curr.speciation(clock)
+                if np.random.rand() < self.speciation_prob:
+                    active_nodes.put(left)
+                    size += 1
+                if np.random.rand() < self.speciation_prob:
+                    active_nodes.put(right)
+                    size += 1
+                self.node_list.append(left)
+                self.node_list.append(right)
             else:
                 return False, size
         self.trace_back(active_nodes)  # mark nodes as visible
@@ -158,8 +176,35 @@ class Tree:
     def prune_tree(self):
         self.root.prune()
 
+    def save_tree(self, clock, filename):
+        tree_str = self.root.to_string(clock)
+        f = open(filename, 'w')
+        f.write(tree_str)
+        f.close()
+        return
+
     def get_AC_list(self):
+        return self._get_AC_list(self.root)
+
+    def _get_AC_list(self, node):
+        if node.left is None and node.right is None:
+            return [[node.get_A(), node.get_C()]]
+        left_lst = self._get_AC_list(node.left)
+        right_lst = self._get_AC_list(node.right)
+        result_lst = left_lst + right_lst
+        result_lst.append([node.get_A(), node.get_C()])
+        return result_lst
+
+    def get_EAD(self, clock):
         lst = []
         for node in reversed(self.node_list):
-            lst.append(np.array([node.get_A(), node.get_C()]))
+            # this pass, calculate all the T
+            if node.visible:
+                node.get_T()
+        for node in reversed(self.node_list):
+            length = node.get_edge_length(clock)
+            if length == np.inf:
+                raise ValueError('Edge length cannot be inf')
+            if node.visible:
+                lst.append(np.array([node.get_T(), length]))
         return np.array(lst)
