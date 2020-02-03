@@ -6,7 +6,7 @@ from functools import total_ordering
 @total_ordering
 class Node:
     def __init__(self, n=1, r_e=0, R_0=0, born_time=0, parent=None,
-                 speciation_time=None, left=None, right=None):
+                 speciation_time=None, left=None, right=None, index=0):
         self.n = n  # niche
         self.r_e = r_e  # boundary
         self.R_0 = R_0  # extrinction parameter
@@ -28,6 +28,7 @@ class Node:
         self.A = None
         # T is the number of tips, as defined in O Dwyer
         self.T = None
+        self.index = index
 
     def __eq__(self, other):
         return self.spec == other.spec
@@ -43,6 +44,8 @@ class Node:
         if self.get_r() == 0:
             return np.inf
         else:
+            #return 1 # constant waiting time
+            #return np.random.exponential(1)  # constant Poisson
             return np.random.exponential(1/self.get_r())
 
     def get_r(self):
@@ -60,8 +63,12 @@ class Node:
         clock is the global time of the evolutionary process
         clock should be the same as self.spec
         '''
-        dn_1 = self.n * np.random.normal(mu, sigma)
-        dn_2 = self.n * np.random.normal(mu, sigma)
+        if sigma == 0:
+            dn_1 = 0
+            dn_2 = 0
+        else:
+            dn_1 = self.n * np.random.normal(mu, sigma)
+            dn_2 = self.n * np.random.normal(mu, sigma)
         n_1 = self.n + dn_1
         n_2 = self.n + dn_2
         self.left = Node(n=n_1, r_e=self.r_e, R_0=self.R_0, born_time=clock,
@@ -141,6 +148,7 @@ class Tree:
         '''
         self.root = Node(n, r_e, R_0, born_time=0)
         self.node_list = []  # in simulte(), root will be added
+        self.length = None
 
     def simulate(self, mu, sigma, tree_size):
         '''
@@ -166,14 +174,17 @@ class Tree:
                 left, right = curr.speciation(mu, sigma, clock)
                 if left.alive:
                     active_nodes.put(left)
+                    left.index = size
+                    size += 1
                 if right.alive:
                     active_nodes.put(right)
-                if left.alive and right.alive:
-                    size += 2
+                    right.index = size
+                    size += 1
             else:
                 # print('The system went extinct at size %d, please\
                 #        try again or adjust the parameters' % size)
                 return False, size
+        self.length = clock
         self.trace_back(active_nodes)  # mark nodes as visible
         return True, clock
 
@@ -217,43 +228,47 @@ class Tree:
                 curr = curr.right
                 continue
 
-    def get_AC_list(self):
-        return self._get_AC_list(self.root)
+    def get_AC_list(self, threshold):
+        return self._get_AC_list(self.root, threshold)
 
-    def _get_AC_list(self, node):
+    def _get_AC_list(self, node, threshold):
+        # Threshold is used to filter out earlier stage nodes
         if node.left is None and node.right is None:
+            if node.index < threshold:
+                return []
             return [[node.get_A(), node.get_C()]]
-        left_lst = self._get_AC_list(node.left)
-        right_lst = self._get_AC_list(node.right)
+        left_lst = self._get_AC_list(node.left, threshold)
+        right_lst = self._get_AC_list(node.right, threshold)
         result_lst = left_lst + right_lst
-        result_lst.append([node.get_A(), node.get_C()])
+        if node.index > threshold:
+            result_lst.append([node.get_A(), node.get_C()])
         return result_lst
 
-    def get_EAD(self, clock):
-        return self._get_EAD_list(self.root, clock)
+    def get_EAD_list(self, clock, threshold):
+        return self._get_EAD_list(self.root, clock, threshold)
 
-    def _get_EAD_list(self, node, clock):
+    def _get_EAD_list(self, node, clock, threshold):
         if node.left is None and node.right is None:
+            if node.index < threshold:
+                return []
             return [[node.get_T(), node.get_edge_length(clock)]]
-        left_lst = self._get_EAD_list(node.left, clock)
-        right_lst = self._get_EAD_list(node.right, clock)
+        left_lst = self._get_EAD_list(node.left, clock, threshold)
+        right_lst = self._get_EAD_list(node.right, clock, threshold)
         result_lst = left_lst + right_lst
-        result_lst.append([node.get_T(), node.get_edge_length(clock)])
+        if node.index > threshold:
+            result_lst.append([node.get_T(), node.get_edge_length(clock)])
         return result_lst
 
-    def get_n(self):
+    def get_misc(self):
         lst = []
         for node in self.node_list:
+            i = node.index
+            b = node.born
+            t = node.get_T()
             a = node.get_A()
             n = node.n
-            lst.append(np.array([a, n]))
+            lst.append(np.array([i, b, t, a,  n]))
         return lst
-
-    def get_specs(self):
-        result = []
-        for node in self.node_list:
-            result.append(node.spec)
-        return np.array(result)
 
     def prune_tree(self):
         self.prune(self.root)
