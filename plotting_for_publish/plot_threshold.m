@@ -1,6 +1,12 @@
 clear all;
+% This script generates Fig. S3.
 
-filename = 'data/threshold/R_0=9/EAD_sigma_4_rep_0.csv';
+% file containing all EAD data for high R0
+filename = '../data/threshold/R_0=9/EAD_sigma_4_rep_0.csv';
+
+% file containing EAD data only in the fluctuation stage (see SI for more)
+%filename = '../data/threshold/EAD_sigma_4_rep_0.csv';
+
 fig1 = figure; 
 %fig1.Renderer = 'Painters'; % save as vector graph
 set(fig1,'resize','off');

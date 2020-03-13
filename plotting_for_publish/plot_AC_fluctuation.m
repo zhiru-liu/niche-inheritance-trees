@@ -1,4 +1,5 @@
 clear all
+
 %% set default color order. %matlab only provides 7 colors then it'll repeat
 co = [0    0.4470    0.7410;
     0.8500    0.3250    0.0980;
@@ -17,10 +18,9 @@ set(groot,'defaultAxesColorOrder',co)
 
 std = [0, 1, 1.5, 2.0, 2.5, 3.0];
 eta = 1.51;
-threshold = 10^6;
+threshold = 10^8;
 %% plot C(A) versus sigma
-% This script generates Fig 6. Choose different folder in model_change/ to 
-% plot the results of different model changes
+% Generates Fig 2
 
 fig1 = figure; 
 %fig1.Renderer = 'Painters'; % save as vector graph
@@ -34,8 +34,7 @@ hold on
 legent_ar = {};
 % Plot all the C(A) data
 for i = 1:6
-    filename = ['../data/model_change/constant_poisson/average/AC_average_sigma_',int2str(i-1),'.csv'];
-    %filename = ['data/saturation/AC/AC_average_R_0=9_sigma_',int2str(i-1),'.csv'];
+    filename = ['../data/fluctuation/AC/AC_average_sigma=',int2str(i-1),'.csv'];
     AC_data = load(filename);
     A = AC_data(:,1);
     C = AC_data(:,2);
@@ -47,18 +46,18 @@ for i = 1:6
     legend_ar{i} = sprintf('$\\sigma_%d=%1.1f$',i,std(i));
 end
 %%
-%Plot the MFT calculations. Only small sigmas bc large ones no longer
-%agree
-% AA = sort(A_);
-% for i = 1:4
-%     p3 = plot(AA, MFT(AA, std(i))./AA,'-');
-%     set(p3, 'linewidth', 1)
-%     legend_ar{6+i} = sprintf('BT $\\sigma_%d=%1.1f$',i,std(i));
+% Plot the MFT calculations. Only small sigmas bc large ones no longer
+% agree
+%  AA = sort(A_);
+%  for i = 1:4
+%      p3 = plot(AA, MFT(AA, std(i))./AA,'-');
+%      set(p3, 'linewidth', 1)
+%      legend_ar{6+i} = sprintf('MF $\\sigma_%d=%1.1f$',i,std(i));
 %  end
-
-% And reference line
-%p2 = plot( A_, exp( log(A_) * eta )./A_ );
-%set(p2, 'linewidth', 1, 'color', 'r')
+% 
+% % And reference line
+% p2 = plot( A_, exp( log(A_) * eta )./A_ );
+% set(p2, 'linewidth', 1, 'color', 'r')
 %%
 hold off
 box on
@@ -67,16 +66,17 @@ set(gca, 'yscale', 'log');
 %ylabel('$\bar{C}/A$', 'interpreter', 'latex')
 %xlabel('$A$', 'interpreter', 'latex') 
 ylim([10^0 10^3])
+xlim([10^0 10^6])
 set(gca, 'XTick', (10.^(0:6)));
 set(gca, 'YTick', (10.^(0:3)));
 set(gca, 'fontsize', 12)
 %leg = legend(legend_ar, 'Interpreter', 'latex');
-%set(leg, 'fontsize', 6, 'location', 'northwest')
+%set(leg, 'fontsize', 5, 'location', 'northwest')
 %legend boxoff
 % Call the helper function to adjust marker size
-%legendmarkeradjust(6)
+%legendmarkeradjust(5)
 
-filename = './results/constant_r_AC_inset.png';
+filename = '../plotting/results/AC_sigma.png';
 %print(filename,'-dpdf');
-%print(filename, '-dpng', '-r600')
+print(filename, '-dpng', '-r600')
 %}

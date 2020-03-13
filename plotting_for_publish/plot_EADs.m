@@ -16,7 +16,7 @@ set(groot,'defaultAxesColorOrder',co);
 
 %%%%%%%%%%%%%%%%%
 
-%% Plot EADs versus sigma
+%% Plot EADs versus sigma; Fig. 5
 %std = [0, 1, 1.5, 2.0, 2.5, 3.0];
 std = [0, 1.0, 2.0, 3.0];
 inds = [0, 1, 3, 5];
@@ -35,7 +35,7 @@ legent_ar = {};
 for i = 4:-1:1
     ind = inds(i);
     shift = shifts(i);
-    filename = ['/Users/Device6/Documents/Research/UIUC/nigel/tree/data/EADs/average/EAD_average_sigma_',int2str(ind),'.csv'];
+    filename = ['../data/EADs/average/EAD_average_sigma_',int2str(ind),'.csv'];
     EAD_data = load(filename);
     k = EAD_data(:,1);
     S = EAD_data(:,2)*10^(shift);

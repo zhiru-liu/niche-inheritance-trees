@@ -1,6 +1,7 @@
 clear all;
+% This script generates figure S1
 
-filename = 'data/percolation/percolation.txt';
+filename = '../data/probability/probability.txt';
 fig1 = figure; 
 %fig1.Renderer = 'Painters'; % save as vector graph
 set(fig1,'resize','off');

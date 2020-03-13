@@ -1,0 +1,1 @@
+This folder holds the data for Fig S3 in supplementary information. The R_0=9 folder contains EAD simulation data for R_0=10^9. The file "EAD_sigma_4_rep_0" is modified from the file with same name in the folder, where only nodes in the fluctuation stage are kept. See detailed discussion about the R_0 parameter in SI section 1.

@@ -16,6 +16,7 @@ set(groot,'defaultAxesColorOrder',co);
 
 %%%%%%%%%%%%%%%%%
 %% Plot Niches versus sigma
+% Fig S2
 std = [0, 1, 1.5, 2.0, 2.5, 3.0];
 lgR = 1;crs;
 fig1 = figure; 
@@ -29,7 +30,7 @@ set(fig1,'PaperPosition',[0 0 3.375 2.5]);
 hold on;
 legent_ar = {};
 for i = 6:-1:1
-    filename = ['data/saturation/niche_R_0=',int2str(lgR),'_',int2str(i-1)];
+    filename = ['../data/niche_saturation/niche_R_0=',int2str(lgR),'_',int2str(i-1)];
     data = load(filename);
     ind_ = downsample(data(:,1),1);
     niche_ = downsample(data(:,5), 1);
